@@ -23,7 +23,7 @@ from logger import init_logger
 from model import create_detection_model, load_detection_model
 from loss_helper import get_supervised_loss
 from ap_helper import APCalculator, parse_predictions, parse_groundtruths
-from train_fs import my_worker_init_fn
+from train_ft import my_worker_init_fn
 
 
 def evaluate(args, model, dataloader, logger, device, dataset_config):

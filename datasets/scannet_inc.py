@@ -22,7 +22,24 @@ from scannet import ScannetAllDatasetConfig, ScannetDataset
 from model import init_detection_model, generate_pseudo_bboxes
 import pc_util
 import scannet_utils
+SCANNET_9_9_BASE_PSEUDO_THRESHOLDS = np.array([
+    0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9])
+SCANNET_14_4_BASE_PSEUDO_THRESHOLDS = np.array([
+    0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9])
+SCANNET_17_1_BASE_PSEUDO_THRESHOLDS = np.array([
+    0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9, 0.9])  # TODO update this
 
+SCANNET_BASE_PSEUDO_THRESHOLDS = {
+    9: SCANNET_9_9_BASE_PSEUDO_THRESHOLDS,
+    14: SCANNET_14_4_BASE_PSEUDO_THRESHOLDS,
+    17: SCANNET_17_1_BASE_PSEUDO_THRESHOLDS,
+}
+
+TRAIN_SET_COUNTS = {
+    9: {0: 113, 1: 307, 2: 300, 3: 1427, 4: 4357, 5: 216, 6: 292, 7: 551, 8: 2026},
+    14: {0: 113, 1: 307, 2: 300, 3: 1427, 4: 4357, 5: 216, 6: 292, 7: 551, 8: 2026, 9: 1985, 10: 661, 11: 186, 12: 116, 13: 390},
+    17: {0: 113, 1: 307, 2: 300, 3: 1427, 4: 4357, 5: 216, 6: 292, 7: 551, 8: 2026, 9: 1985, 10: 661, 11: 186, 12: 116, 13: 390, 14: 406, 15: 1271, 16: 201, 17: 928}  # TODO update for 17
+}
 
 class ScannetIncDataset(ScannetDataset):
 
@@ -39,9 +56,13 @@ class ScannetIncDataset(ScannetDataset):
                                                                      len(self.scan_names)))
 
         print('+++ Init base detector for generating pseudo bounding boxes +++')
-        self.base_detector, self.device = init_detection_model(args, self.dataset_config)
+        self.base_detector, self.device = init_detection_model(args, self.dataset_config, model_name1='static')
         self.base_detector.share_memory()
         self.base_detector.eval()
+
+        self.dynamic_detector, self.device = init_detection_model(args, self.dataset_config, model_name1='dynamic')
+        self.dynamic_detector.share_memory()
+        self.dynamic_detector.eval()
 
         self.pseudo_config_dict = {'remove_empty_box': True, 'use_3d_nms': True, 'nms_iou': 0.25,
                                    'use_old_type_nms': False, 'cls_nms': False, 'per_class_proposal': False,
@@ -66,7 +87,7 @@ class ScannetIncDataset(ScannetDataset):
         point_cloud, _ = self._sample_pointcloud(raw_point_cloud)
         ema_point_cloud, _  = self._sample_pointcloud(raw_point_cloud)
 
-        pseudo_bboxes = generate_pseudo_bboxes(self.base_detector, self.device, self.pseudo_config_dict, point_cloud)
+        pseudo_bboxes = generate_pseudo_bboxes(self.base_detector, self.dynamic_detector, self.device, self.pseudo_config_dict, point_cloud,instance_bboxes,plist)
 
         if pseudo_bboxes is not None:
             new_pseudo_bboxes = np.zeros((pseudo_bboxes.shape[0], 7))
